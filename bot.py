@@ -1,15 +1,19 @@
 import os
 
+from news.similarity import encontrar_noticia_semelhante
 import discord
-from discord import app_commands
+
 from discord.ext import commands, tasks
 from dotenv import load_dotenv
-
-
-from news.rss import buscar_noticia_mais_recente, buscar_noticias
+from database import (
+    buscar_noticias_publicadas,
+    criar_tabela,
+    noticia_existe,
+    salvar_noticia,
+)
 from news.embed import criar_embed_noticia
-from database import criar_tabela
-from database import criar_tabela, noticia_existe, salvar_noticia
+from news.rss import buscar_noticia_mais_recente, buscar_noticias_de_todas_as_fontes
+from news.similarity import encontrar_noticia_semelhante
 
 load_dotenv()
 
@@ -23,6 +27,8 @@ if not NEWS_CHANNEL_ID:
     )
 
 NEWS_CHANNEL_ID = int(NEWS_CHANNEL_ID)
+NEWS_CHECK_INTERVAL_MINUTES = int(os.getenv("NEWS_CHECK_INTERVAL_MINUTES", "5"))
+
 
 intents = discord.Intents.default()
 intents.message_content = True
@@ -78,10 +84,22 @@ async def ultima_noticia(interaction: discord.Interaction):
         )
         return
 
+    noticias_publicadas = buscar_noticias_publicadas()
+    semelhante = encontrar_noticia_semelhante(
+        noticia["titulo"],
+        noticias_publicadas
+    )
+
+    if semelhante is not None:
+        await interaction.response.send_message(
+            "⏭️ Encontrei uma notícia parecida já publicada anteriormente."
+        )
+        return
+
     embed = criar_embed_noticia(
         noticia,
-        categoria="Games",
-        fonte="GameSpot"
+        categoria=noticia.get("categoria", "Games"),
+        fonte=noticia.get("fonte", "GameSpot")
     )
 
     await interaction.response.send_message(
@@ -90,8 +108,8 @@ async def ultima_noticia(interaction: discord.Interaction):
 
     salvar_noticia(
         noticia,
-        fonte="GameSpot",
-        categoria="Games"
+        fonte=noticia.get("fonte", "GameSpot"),
+        categoria=noticia.get("categoria", "Games")
     )
     
 async def noticia(interaction: discord.Interaction):
@@ -141,36 +159,64 @@ async def verificar_noticias():
         print("❌ Canal de notícias não encontrado.")
         return
 
-    noticias = buscar_noticias()
+    noticias = buscar_noticias_de_todas_as_fontes()
+    noticias_publicadas = buscar_noticias_publicadas()
+    print(f"📰 RSS: {len(noticias)} notícias encontradas.")
 
     for noticia in reversed(noticias):
 
-        if noticia_existe(noticia["link"]):
-            continue
+        try:
 
-        embed = criar_embed_noticia(
-            noticia,
-            categoria="Games",
-            fonte="GameSpot"
-        )
+            print(f"🔎 Verificando: {noticia['titulo']}")
+            if noticia_existe(noticia["link"]):
+                print(f"⏭️ Já publicada: {noticia['titulo']}")
+                continue    
 
-        await canal.send(embed=embed)
+            semelhante = encontrar_noticia_semelhante(
+                noticia["titulo"],
+                noticias_publicadas
+            )
 
-        salvar_noticia(
-            noticia,
-            fonte="GameSpot",
-            categoria="Games"
-        )
+            if semelhante is not None:
+                print(f"⏭️ Parecida com notícia já publicada: {noticia['titulo']}")
+                continue
 
-        print(f"📰 Notícia publicada: {noticia['titulo']}")
+            embed = criar_embed_noticia(
+                noticia,
+                categoria=noticia["categoria"],
+                fonte=noticia["fonte"]
+            )
+            
 
-@tasks.loop(seconds=30)
+            await canal.send(embed=embed)
+
+            salvar_noticia(
+                noticia,
+                fonte=noticia["fonte"],
+                categoria=noticia["categoria"]
+            )
+
+            noticias_publicadas.append(noticia)
+
+            print(f"📰 Notícia publicada: {noticia['titulo']}")
+
+        except Exception as erro:
+
+            print(
+                f"❌ Erro ao publicar notícia: "
+                f"{noticia.get('titulo', 'Sem título')}"
+            )
+
+            print(f"Detalhes do erro: {erro}")
+
+@tasks.loop(minutes=NEWS_CHECK_INTERVAL_MINUTES)
 async def verificar_noticias_automaticamente():
+
     try:
         await verificar_noticias()
 
     except Exception as erro:
-        print(f"❌ Erro ao verificar notícias: {erro}")
+        print(f"❌ Erro no sistema de notícias: {erro}")
 
 
 bot.run(TOKEN)

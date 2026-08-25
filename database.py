@@ -1,7 +1,12 @@
 import sqlite3
 
-
 DATABASE_NAME = "nerd_news.db"
+
+from database import (
+    noticia_existe,
+    salvar_noticia,
+    buscar_noticias_publicadas
+)
 
 
 def conectar():
@@ -66,3 +71,45 @@ def salvar_noticia(noticia, fonte, categoria):
 
     conexao.commit()
     conexao.close()
+
+def buscar_noticias_publicadas():
+
+    conn = sqlite3.connect(DATABASE_NAME)
+
+    cursor = conn.cursor()
+
+    cursor.execute(
+        "SELECT titulo FROM noticias"
+    )
+
+    resultados = cursor.fetchall()
+
+    conn.close()
+
+    return [
+        {
+            "titulo": resultado[0]
+        }
+        for resultado in resultados
+    ]
+
+def buscar_noticias_publicadas():
+
+    conn = sqlite3.connect(DATABASE_NAME)
+
+    cursor = conn.cursor()
+
+    cursor.execute(
+        "SELECT titulo FROM noticias"
+    )
+
+    resultados = cursor.fetchall()
+
+    conn.close()
+
+    return [
+        {
+            "titulo": resultado[0]
+        }
+        for resultado in resultados
+    ]
