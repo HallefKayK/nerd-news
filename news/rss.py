@@ -4,16 +4,18 @@ import os
 
 import feedparser
 
+from sources.config import FONTES
+from news.translator import traduzir_texto
+from dotenv import load_dotenv
 from news.filter import (
     noticia_interessa,
     noticia_valida,
     classificar_categoria
 )
-from news.translator import traduzir_texto
-from sources.config import FONTES
+
+load_dotenv()
 
 RSS_URL = "https://www.gamespot.com/feeds/mashup/"
-
 
 def limpar_html(texto):
     texto = re.sub(r"<[^>]+>", "", texto)
@@ -35,12 +37,13 @@ def extrair_imagem(noticia):
 
 def noticia_eh_recente(entrada):
     limite_horas = int(
-        os.getenv("MAX_NEWS_AGE_HOURS", "6")
+        os.getenv("MAX_NEWS_AGE_HOURS", "24")
     )
 
     data_publicacao = entrada.get("published_parsed")
 
     if not data_publicacao:
+        print("⚠️ Sem published_parsed — notícia aceita")
         return True
 
     data_publicacao = datetime(
@@ -51,8 +54,14 @@ def noticia_eh_recente(entrada):
     agora = datetime.now(timezone.utc)
 
     idade = agora - data_publicacao
+    idade_horas = idade.total_seconds() / 3600
 
-    return idade.total_seconds() <= limite_horas * 3600
+    recente = idade_horas <= limite_horas
+
+    print(f"{'✅ RECENTE' if recente else '❌ ANTIGA'}")
+    print()
+
+    return recente
 
 
 def buscar_noticias(url):
@@ -60,6 +69,11 @@ def buscar_noticias(url):
     limite = 10
 
     feed = feedparser.parse(url)
+    
+    print(
+        f"🧪 DEBUG: RSS retornou "
+        f"{len(feed.entries)} entradas brutas"
+    )
 
     noticias = []
 
@@ -94,7 +108,6 @@ def buscar_noticias(url):
     return noticias
 
 def buscar_noticias_de_todas_as_fontes():
-
     todas_as_noticias = []
 
     for categoria, fontes in FONTES.items():
@@ -112,22 +125,19 @@ def buscar_noticias_de_todas_as_fontes():
             )
 
             try:
-
                 noticias = buscar_noticias(url)
 
                 noticias_filtradas = []
 
                 for noticia in noticias:
 
-                    noticia["categoria"] = categoria
-                    noticia["fonte"] = nome_fonte
-
                     if not noticia_valida(noticia):
                         print(
-                            f"❌ Entrada ignorada: "
-                            f"{noticia['titulo', 'Sem título']}"
+                            f"⚠️ Entrada inválida ignorada: "
+                            f"{noticia.get('titulo', 'Sem título')}"
                         )
                         continue
+
                     categoria_real = classificar_categoria(
                         noticia,
                         categoria
@@ -136,8 +146,29 @@ def buscar_noticias_de_todas_as_fontes():
                     noticia["categoria"] = categoria_real
                     noticia["fonte"] = nome_fonte
 
-            except Exception as erro:
+                    if not noticia_interessa(
+                        noticia,
+                        categoria_real
+                    ):
+                        print(
+                            f"🚫 Ignorada pelo filtro: "
+                            f"{noticia['titulo']}"
+                        )
+                        continue
 
+                    noticias_filtradas.append(noticia)
+
+                todas_as_noticias.extend(
+                    noticias_filtradas
+                )
+
+                print(
+                    f"✅ {nome_fonte}: "
+                    f"{len(noticias)} encontradas / "
+                    f"{len(noticias_filtradas)} aprovadas"
+                )
+
+            except Exception as erro:
                 print(
                     f"❌ Erro ao consultar "
                     f"{nome_fonte}: {erro}"

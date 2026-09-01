@@ -18,17 +18,41 @@ from news.similarity import encontrar_noticia_semelhante
 load_dotenv()
 
 TOKEN = os.getenv("DISCORD_TOKEN")
-GUILD_ID = 1182446203212943441
-NEWS_CHANNEL_ID = os.getenv("NEWS_CHANNEL_ID")
 
-if not NEWS_CHANNEL_ID:
+GUILD_ID = 1182446203212943441
+
+GAMES_CHANNEL_ID = os.getenv("GAMES_CHANNEL_ID")
+TECH_CHANNEL_ID = os.getenv("TECH_CHANNEL_ID")
+
+
+if not GAMES_CHANNEL_ID:
     raise RuntimeError(
-        "NEWS_CHANNEL_ID não encontrado no arquivo .env"
+        "GAMES_CHANNEL_ID não encontrado no arquivo .env"
     )
 
-NEWS_CHANNEL_ID = int(NEWS_CHANNEL_ID)
-NEWS_CHECK_INTERVAL_MINUTES = int(os.getenv("NEWS_CHECK_INTERVAL_MINUTES", "5"))
+if not TECH_CHANNEL_ID:
+    raise RuntimeError(
+        "TECH_CHANNEL_ID não encontrado no arquivo .env"
+    )
 
+
+GAMES_CHANNEL_ID = int(GAMES_CHANNEL_ID)
+TECH_CHANNEL_ID = int(TECH_CHANNEL_ID)
+
+
+CANAIS_NOTICIAS = {
+    "games": GAMES_CHANNEL_ID,
+    "tecnologia": TECH_CHANNEL_ID
+}
+
+
+NEWS_CHECK_INTERVAL_MINUTES = int(
+    os.getenv("NEWS_CHECK_INTERVAL_MINUTES", "5")
+)
+if not TOKEN:
+    raise RuntimeError(
+        "DISCORD_TOKEN não encontrado no arquivo .env"
+    )
 
 intents = discord.Intents.default()
 intents.message_content = True

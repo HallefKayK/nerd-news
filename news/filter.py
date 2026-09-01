@@ -78,6 +78,7 @@ def noticia_valida(noticia):
         return False
 
     return True
+    return True
 
 def classificar_categoria(noticia, categoria_original):
     link = noticia.get("link", "").lower()
@@ -88,10 +89,16 @@ def classificar_categoria(noticia, categoria_original):
     if "/software/" in link:
         return "tecnologia"
 
+    if "/computing/" in link:
+        return "tecnologia"
+
     if "/games/" in link:
         return "games"
 
     if "/gaming/" in link:
         return "games"
+
+    if "/reviews/" in link:
+        return categoria_original
 
     return categoria_original
